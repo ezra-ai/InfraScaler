@@ -1,0 +1,73 @@
+name: "Scale Cloud Run Services"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action: scale_up or scale_down"
+        required: true
+        type: choice
+        options:
+          - scale_up
+          - scale_down
+        default: scale_up
+
+jobs:
+  scale-cloud-run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_GITHUB_PRODUCTION_SA }}'
+
+      - name: Setup gcloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: "gcloud"
+
+      - name: Scale Cloud Run Services
+        run: |
+          ACTION=${{ github.event.inputs.action }}
+          REGION="us-east-4" 
+
+          declare -A SERVICE_INSTANCES
+          SERVICE_INSTANCES=(
+            ["agent-backend"]=2
+            ["api-dashboard"]=2
+            ["graphql-node-api"]=2
+            ["pji-integration"]=4
+            ["webhook-pji"]=2
+          )
+
+          for SERVICE in "${!SERVICE_INSTANCES[@]}"; do
+            if [ "$ACTION" = "scale_up" ]; then
+              INSTANCES=${SERVICE_INSTANCES[$SERVICE]}
+              echo "Scaling UP $SERVICE to $INSTANCES instances..."
+              gcloud run services update $SERVICE \
+                --region $REGION \
+                --project ${{ secrets.GCP_PROJECT_ID }} \
+                --min-instances $INSTANCES
+            elif [ "$ACTION" = "scale_down" ]; then
+              echo "Scaling DOWN $SERVICE to 0 instances..."
+              gcloud run services update $SERVICE \
+                --region $REGION \
+                --project ${{ secrets.GCP_PROJECT_ID }} \
+                --min-instances 0
+            else
+              echo "Invalid action: $ACTION"
+              exit 1
+            fi
+          done
+        shell: bash
