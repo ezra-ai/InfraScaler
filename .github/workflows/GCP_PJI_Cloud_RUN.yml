@@ -30,7 +30,7 @@ jobs:
       - name: Authenticate via SAKE
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_GITHUB_PRODUCTION_SA }}'
+          credentials_json: ${{ secrets.GCP_GITHUB_PRODUCTION_SA }}
   
       # ✅ Then setup gcloud with the authenticated context
       - uses: google-github-actions/setup-gcloud@v2
